@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#160b2b">
+  <title>Aurem World</title>
+  <link rel="icon" type="image/png" href="aurem-world-icon.png">
+  <link rel="apple-touch-icon" href="aurem-world-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <a class="brand" href="#"><img class="brand-logo" src="aurem-world-icon.png" alt="Aurem World logo"><span>AUREM <b>WORLD</b></span></a>
+      <div class="top-actions"><button id="search-toggle" class="icon-btn" aria-label="Search">⌕</button><button id="upload-open" class="primary-btn">＋ Create</button><button id="auth-open" class="avatar">Sign in</button></div>
+    </header>
+    <div id="search-panel" class="search-panel hidden"><input id="search-input" placeholder="Search people or captions…"><div id="search-results"></div></div>
+    <main class="layout">
+      <aside class="sidebar">
+        <button class="nav active" data-view="for-you">⌂ <span>For You</span></button>
+        <button class="nav" data-view="following">♡ <span>Following</span></button>
+        <button class="nav" data-view="discover">⌕ <span>Discover</span></button>
+        <button class="nav" data-view="inbox">✉ <span>Inbox</span></button>
+        <button class="nav" data-view="profile">♙ <span>Profile</span></button>
+        <div class="side-note">A world of creativity.<br><small>Share what moves you.</small></div>
+      </aside>
+      <section class="content">
+        <div id="notice" class="notice hidden"></div>
+        <section id="feed-view"><div class="section-heading"><div><h1 id="feed-title">For You</h1><p>Discover videos from Aurem World.</p></div><span class="live-pill">● LIVE COMMUNITY</span></div><div id="feed" class="feed"><div class="loading">Connect your Supabase project to load the feed.</div></div></section>
+        <section id="profile-view" class="hidden"></section>
+        <section id="inbox-view" class="hidden"><div class="section-heading"><div><h1>Inbox</h1><p>Your conversations and notifications.</p></div></div><div class="panel"><p>Messaging is enabled after database setup. Select a user from Discover to start a conversation.</p><div id="inbox-list"></div></div></section>
+      </section>
+    </main>
+    <nav class="mobile-nav"><button data-view="for-you">⌂<small>Home</small></button><button data-view="discover">⌕<small>Discover</small></button><button id="mobile-create">＋<small>Create</small></button><button data-view="inbox">✉<small>Inbox</small></button><button data-view="profile">♙<small>Me</small></button></nav>
+  </div>
+
+  <dialog id="auth-dialog" class="modal"><form id="auth-form" class="modal-card"><button type="button" class="close" data-close>×</button><div class="brand modal-brand"><img class="brand-logo" src="aurem-world-icon.png" alt="Aurem World logo"><span>AUREM <b>WORLD</b></span></div><h2 id="auth-title">Welcome to Aurem World</h2><p id="auth-subtitle">Sign in to continue your journey.</p><label id="username-wrap" class="hidden">Username<input id="auth-username" autocomplete="username" placeholder="e.g. auremcreator"></label><label>Email<input id="auth-email" type="email" required autocomplete="email"></label><label>Password<input id="auth-password" type="password" required minlength="6" autocomplete="current-password"></label><button class="primary-btn wide" id="auth-submit" type="submit">Sign in</button><p class="switch-auth"><span id="auth-switch-text">New here?</span> <button type="button" id="auth-switch">Create account</button></p><p class="fineprint">Be kind, protect your privacy, and only share content you have permission to post.</p></form></dialog>
+
+  <dialog id="upload-dialog" class="modal"><form id="upload-form" class="modal-card"><button type="button" class="close" data-close>×</button><h2>Create a post</h2><p>Share a video or image with the Aurem World community.</p><label>Caption<textarea id="post-caption" maxlength="500" placeholder="Write a caption…"></textarea></label><label>Media file<input id="post-file" type="file" accept="video/*,image/*" required></label><div class="fineprint">Use content you own or have permission to share. Large videos may take time to upload.</div><button class="primary-btn wide" type="submit">Upload post</button><div id="upload-progress" class="fineprint"></div></form></dialog>
+  <dialog id="comments-dialog" class="modal"><div class="modal-card"><button class="close" data-close>×</button><h2>Comments</h2><div id="comments-list"></div><form id="comment-form"><input id="comment-input" maxlength="1000" placeholder="Add a comment…" required><button class="primary-btn">Post</button></form></div></dialog>
+  <dialog id="chat-dialog" class="modal"><div class="modal-card"><button class="close" data-close>×</button><h2 id="chat-title">Messages</h2><div id="chat-messages" class="chat-messages"></div><form id="chat-form"><input id="chat-input" maxlength="2000" placeholder="Write a message…" required><button class="primary-btn">Send</button></form></div></dialog>
+  <script src="app.js"></script>
+</body></html>
