@@ -4,7 +4,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_gxv0C4OePj4S6FrqSuTxVw_NuNcHqoO";
 const OWNER_USERNAME = "anonymous_001";
 const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_ANON_KEY.includes("YOUR_");
 const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-let currentUser = null, currentProfile = null, authMode = "login", activeView = "for-you", activeChat = null, commentsPost = null;
+let currentUser = null, currentProfile = null, authMode = "login", activeView = "for-you", activeChat = null, commentsPost = null, activeChatChannel = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function notice(msg){$("notice").textContent=msg;$("notice").classList.remove("hidden");setTimeout(()=>$("notice").classList.add("hidden"),6500)}
@@ -42,7 +42,7 @@ $("auth-form").addEventListener("submit",async e=>{
     submit.disabled=false; submit.textContent=authMode==="login"?"Sign in":"Create account";
   }
 });
-async function loadSession(){if(!requireDb())return;const {data:{session}}=await db.auth.getSession();currentUser=session?.user||null;currentProfile=null;if(currentUser){let {data}=await db.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();currentProfile=data;if(!data){const username=(currentUser.user_metadata?.username||"user_"+currentUser.id.slice(0,6)).toLowerCase();let ins=await db.from("profiles").insert({id:currentUser.id,username,display_name:username}).select().single();currentProfile=ins.data} $("auth-open").textContent="Sign out";}else $("auth-open").textContent="Sign in";await loadFeed()};
+async function loadSession(){if(!requireDb())return;const {data:{session}}=await db.auth.getSession();currentUser=session?.user||null;currentProfile=null;if(currentUser){let {data}=await db.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();currentProfile=data;if(!data){const username=(currentUser.user_metadata?.username||"user_"+currentUser.id.slice(0,6)).toLowerCase();let ins=await db.from("profiles").insert({id:currentUser.id,username,display_name:username}).select().single();currentProfile=ins.data} $("auth-open").textContent="Sign out";}else $("auth-open").textContent="Sign in";await updatePresence();if(currentUser)setInterval(updatePresence,60000);await loadFeed()};
 db?.auth.onAuthStateChange(()=>setTimeout(loadSession,0));
 function setView(view){activeView=view;document.querySelectorAll(".nav").forEach(b=>b.classList.toggle("active",b.dataset.view===view));$("feed-view").classList.toggle("hidden",view==="profile"||view==="inbox");$("profile-view").classList.toggle("hidden",view!=="profile");$("inbox-view").classList.toggle("hidden",view!=="inbox");if(view==="profile")loadProfile(currentProfile?.id);else if(view==="inbox")loadInbox();else{ $("feed-title").textContent=view==="following"?"Following":view==="discover"?"Discover":"For You";loadFeed()}}
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
@@ -52,24 +52,48 @@ function renderPost(p,liked,c){
  const media=isVideo?`<video src="${esc(p.media_url)}" controls playsinline preload="metadata"></video>`:`<img src="${esc(p.media_url)}" alt="Post by ${esc(prof.username)}">`;
  const isOwner=currentUser?.id===p.user_id, isAdmin=currentProfile?.username===OWNER_USERNAME;
  const deleteButton=(isOwner||isAdmin)?'<button class="action danger" data-action="delete">🗑<small>Delete</small></button>':"";
- return `<article class="post" data-post="${p.id}" data-media-url="${esc(p.media_url)}" data-media-path="${esc(p.media_path||"")}" data-media-type="${p.media_type}" data-creator="${esc(prof.username||"creator")}" data-user-id="${p.user_id}"><div><div class="media-wrap">${media}</div><div class="post-info"><div class="creator"><span class="profile-avatar" style="width:30px;height:30px;font-size:14px">${prof.avatar_url?`<img src="${esc(prof.avatar_url)}" alt="">`:esc((prof.display_name||prof.username||"?")[0].toUpperCase())}</span><span>${esc(prof.display_name||prof.username||"Creator")} ${prof.is_verified?'<span class="verified">✓</span>':""}<br><small>@${esc(prof.username||"user")}</small></span></div><p class="caption">${esc(p.caption||"")}</p></div></div><div class="post-actions"><button class="action like ${liked?"liked":""}" data-action="like">♥<small>${c?.like_count||0}</small></button><button class="action" data-action="comments">▢<small>${c?.comment_count||0}</small></button><button class="action" data-action="share">↗<small>Share</small></button><button class="action" data-action="download">⬇<small>Download</small></button><button class="action" data-action="follow" data-user="${p.user_id}">＋<small>Follow</small></button>${deleteButton}</div></article>`
+ return `<article class="post" data-post="${p.id}" data-media-url="${esc(p.media_url)}" data-media-path="${esc(p.media_path||"")}" data-media-type="${p.media_type}" data-creator="${esc(prof.username||"creator")}" data-user-id="${p.user_id}"><div><div class="media-wrap">${media}</div><div class="post-info"><div class="creator"><span class="profile-avatar" style="width:30px;height:30px;font-size:14px">${prof.avatar_url?`<img src="${esc(prof.avatar_url)}" alt="">`:esc((prof.display_name||prof.username||"?")[0].toUpperCase())}</span><span>${esc(prof.display_name||prof.username||"Creator")} ${prof.is_verified?'<span class="verified">✓</span>':""}<br><small>@${esc(prof.username||"user")}</small></span></div><p class="caption">${esc(p.caption||"")}</p></div></div><div class="post-actions"><button class="action like ${liked?"liked":""}" data-action="like">♥<small>${c?.like_count||0}</small></button><button class="action" data-action="comments">▢<small>${c?.comment_count||0}</small></button><button class="action" data-action="share">↗<small>Share</small></button><button class="action" data-action="reshare">⟳<small>Reshare</small></button><button class="action" data-action="download">⬇<small>Download</small></button><button class="action" data-action="follow" data-user="${p.user_id}">＋<small>Follow</small></button>${deleteButton}</div></article>`
 }
-function bindPostActions(){document.querySelectorAll(".post").forEach(el=>el.querySelectorAll("[data-action]").forEach(b=>b.onclick=()=>{let id=el.dataset.post,action=b.dataset.action;if(action==="like")toggleLike(id,b);if(action==="comments")openComments(id);if(action==="share")sharePost(id);if(action==="download")downloadWatermarked(el);if(action==="delete")deletePost(el);if(action==="follow")toggleFollow(b.dataset.user,b)}))}
+function bindPostActions(){document.querySelectorAll(".post").forEach(el=>el.querySelectorAll("[data-action]").forEach(b=>b.onclick=()=>{let id=el.dataset.post,action=b.dataset.action;if(action==="like")toggleLike(id,b);if(action==="comments")openComments(id);if(action==="share")sharePost(id);if(action==="reshare")resharePost(id);if(action==="download")downloadWatermarked(el);if(action==="delete")deletePost(el);if(action==="follow")toggleFollow(b.dataset.user,b)}))}
 async function downloadWatermarked(post){
  const url=post.dataset.mediaUrl,type=post.dataset.mediaType,creator=post.dataset.creator||"creator";
  const btn=post.querySelector('[data-action="download"]');
  if(btn){btn.disabled=true;btn.innerHTML='…<small>Preparing</small>'}
  try {
-  // Videos are downloaded as the original complete file. Re-recording a video in
-  // the browser can truncate its ending or omit audio on some Android devices.
   if(type==="video"){
-   const response=await fetch(url);
-   if(!response.ok)throw new Error(`Video download failed (${response.status}).`);
-   const blob=await response.blob();
-   if(!blob.size)throw new Error("The downloaded video file was empty.");
-   const ext=(url.split("?")[0].match(/\.([a-z0-9]{2,5})$/i)||[])[1]||"mp4";
-   saveBlob(blob,`aurem-world-${creator}.${ext}`);
-   notice("Original video downloaded. It is saved without re-encoding so the full video and audio are preserved.");
+   // A watermark is burned into the downloaded copy. Browser support varies;
+   // if capture is unavailable, retain the original file rather than create a silent file.
+   const video=post.querySelector("video");
+   if(video && video.captureStream && window.MediaRecorder){
+    const wasPaused=video.paused, oldTime=video.currentTime;
+    const stream=video.captureStream();
+    const canvas=document.createElement("canvas");
+    canvas.width=720; canvas.height=1280;
+    const ctx=canvas.getContext("2d");
+    const draw=()=>{ctx.fillStyle="#08060d";ctx.fillRect(0,0,canvas.width,canvas.height);
+      const vw=video.videoWidth||720,vh=video.videoHeight||1280,scale=Math.min(canvas.width/vw,canvas.height/vh);
+      const w=vw*scale,h=vh*scale;ctx.drawImage(video,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
+      const x=((Date.now()/19)%(canvas.width-210))+12,y=((Date.now()/31)%(canvas.height-55))+25;
+      ctx.font="bold 24px Arial";ctx.fillStyle="rgba(255,255,255,.82)";ctx.shadowColor="#000";ctx.shadowBlur=5;
+      ctx.fillText("AUREM WORLD",x,y);};
+    const paint=setInterval(draw,1000/25); draw();
+    const mixed=new MediaStream([...canvas.captureStream(25).getVideoTracks(),...stream.getAudioTracks()]);
+    const mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")?"video/webm;codecs=vp9,opus":"video/webm";
+    const recorder=new MediaRecorder(mixed,{mimeType:mime}),chunks=[];
+    const finished=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+      recorder.onerror=()=>reject(new Error("Watermarked video export failed."));
+      recorder.onstop=()=>resolve(new Blob(chunks,{type:"video/webm"}));});
+    video.currentTime=0; await video.play(); recorder.start();
+    await new Promise(resolve=>{video.onended=resolve;});
+    recorder.stop(); clearInterval(paint); video.pause(); video.currentTime=oldTime;
+    if(!wasPaused) await video.play().catch(()=>{});
+    const blob=await finished; saveBlob(blob,`aurem-world-${creator}.webm`);
+    notice("Watermarked video copy downloaded. Playback/capture support depends on your browser.");
+   } else {
+    const response=await fetch(url); if(!response.ok)throw new Error("Video download failed.");
+    saveBlob(await response.blob(),`aurem-world-${creator}.mp4`);
+    notice("Your browser cannot render a watermark on this video, so the original was downloaded.");
+   }
   } else {
    const response=await fetch(url); if(!response.ok)throw new Error("Image could not be fetched");
    const blob=await response.blob(),objectUrl=URL.createObjectURL(blob),img=new Image();
@@ -104,13 +128,86 @@ async function sharePost(id){let url=`${location.origin}${location.pathname}?pos
 async function openComments(id){commentsPost=id;$("comments-list").innerHTML="Loading…";showDialog("comments-dialog");let {data,error}=await db.from("comments").select("*,profiles(username,display_name)").eq("post_id",id).order("created_at");$("comments-list").innerHTML=error?esc(error.message):(data||[]).map(c=>`<div class="comment-item"><b>@${esc(c.profiles?.username||"user")}</b><p>${esc(c.body)}</p></div>`).join("")||"No comments yet."}
 $("comment-form").onsubmit=async e=>{e.preventDefault();if(!currentUser){notice("Sign in to comment.");return}let body=$("comment-input").value.trim();if(!body)return;let {error}=await db.from("comments").insert({post_id:commentsPost,user_id:currentUser.id,body});if(error)notice(error.message);else{$("comment-input").value="";openComments(commentsPost);loadFeed()}};
 $("upload-form").onsubmit=async e=>{e.preventDefault();if(!currentUser)return;let file=$("post-file").files[0];if(!file)return;if(file.size>200*1024*1024){notice("Please choose a file smaller than 200 MB.");return}let type=file.type.startsWith("video/")?"video":"image";if(!["video","image"].includes(type)){notice("Choose an image or video.");return}let ext=file.name.split(".").pop().toLowerCase(),path=`${currentUser.id}/${crypto.randomUUID()}.${ext}`;$("upload-progress").textContent="Uploading…";let {error:upErr}=await db.storage.from("media").upload(path,file,{upsert:false,contentType:file.type});if(upErr){$("upload-progress").textContent=upErr.message;return}let {data:{publicUrl}}=db.storage.from("media").getPublicUrl(path);let {error}=await db.from("posts").insert({user_id:currentUser.id,caption:$("post-caption").value.trim(),media_url:publicUrl,media_path:path,media_type:type,visibility:"public"});if(error){$("upload-progress").textContent=error.message;return}$("upload-form").reset();$("upload-progress").textContent="";closeDialogs();setView("for-you");notice("Your post is live on Aurem World!")};
-async function loadProfile(id){if(!id){$("profile-view").innerHTML='<div class="empty">Sign in to view your profile.</div>';return}let {data:p}=await db.from("profiles").select("*").eq("id",id).single();let [{count:followers},{count:following},{data:posts}]=await Promise.all([db.from("follows").select("*",{count:"exact",head:true}).eq("following_id",id),db.from("follows").select("*",{count:"exact",head:true}).eq("follower_id",id),db.from("posts").select("*").eq("user_id",id).order("created_at",{ascending:false})]);$("profile-view").innerHTML=`<div class="profile-head"><div class="profile-avatar">${p?.avatar_url?`<img src="${esc(p.avatar_url)}" alt="Profile picture">`:esc((p?.display_name||p?.username||"U")[0].toUpperCase())}</div><div><h2>${esc(p?.display_name||p?.username)} ${p?.is_verified?'<span class="verified">✓</span>':""}</h2><div>@${esc(p?.username||"")}</div><div class="profile-stats"><span>${posts?.length||0} posts</span><span>${followers||0} followers</span><span>${following||0} following</span></div><div class="profile-actions">${id===currentUser?.id?'<button class="primary-btn" id="edit-profile">Edit profile</button><label class="profile-upload">Change photo<input id="avatar-file" type="file" accept="image/*"></label><button class="avatar" id="privacy-toggle">'+(p.is_private?'Make public':'Make private')+'</button>':`<button class="primary-btn" id="profile-follow">Follow</button><button class="avatar" id="profile-message">Message</button>`}</div></div></div><div class="profile-grid">${(posts||[]).map(x=>x.media_type==="video"?`<video src="${esc(x.media_url)}" controls></video>`:`<img src="${esc(x.media_url)}">`).join("")}</div>`;$("edit-profile")?.addEventListener("click",async()=>{let name=prompt("Display name",p.display_name||"");if(name!==null){let {error}=await db.from("profiles").update({display_name:name}).eq("id",currentUser.id);if(error)notice(error.message);else loadProfile(id)}});$("avatar-file")?.addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;if(!file.type.startsWith("image/")){notice("Choose an image file.");return}const path=`${currentUser.id}/avatar-${Date.now()}.${file.name.split(".").pop()}`;const {error:upErr}=await db.storage.from("avatars").upload(path,file,{upsert:true,contentType:file.type});if(upErr){notice(upErr.message);return}const {data}=db.storage.from("avatars").getPublicUrl(path);const {error}=await db.from("profiles").update({avatar_url:data.publicUrl}).eq("id",currentUser.id);if(error)notice(error.message);else{notice("Profile picture updated.");loadProfile(id)}});$("privacy-toggle")?.addEventListener("click",async()=>{const {error}=await db.from("profiles").update({is_private:!p.is_private}).eq("id",currentUser.id);if(error)notice(error.message);else{notice(p.is_private?"Your account is now public.":"Your account is now private.");loadProfile(id)}});if(id===currentUser?.id){db.from("follow_requests").select("id,requester_id,profiles!follow_requests_requester_id_fkey(username,display_name)").eq("target_id",id).eq("status","pending").then(({data,error})=>{if(error){notice("Follow requests: "+error.message);return}if(data?.length){const box=document.createElement("div");box.className="panel follow-requests";box.innerHTML="<h3>Follow requests</h3>"+data.map(r=>`<div class="request-row"><span>@${esc(r.profiles?.username||"user")}</span><button class="primary-btn" data-approve="${r.id}">Approve</button><button class="avatar" data-decline="${r.id}">Decline</button></div>`).join("");$("profile-view").insertBefore(box,$("profile-view").querySelector(".profile-grid"));box.querySelectorAll("[data-approve]").forEach(btn=>btn.onclick=async()=>{const {error}=await db.rpc("approve_follow_request",{request_id:btn.dataset.approve});if(error){notice(error.message);return}notice("Follow request approved.");loadProfile(id)});box.querySelectorAll("[data-decline]").forEach(btn=>btn.onclick=async()=>{const {error}=await db.from("follow_requests").update({status:"declined"}).eq("id",btn.dataset.decline);if(error)notice(error.message);else loadProfile(id)});}})}$("profile-follow")?.addEventListener("click",()=>toggleFollow(id,$("profile-follow")));$("profile-message")?.addEventListener("click",()=>openChat(id,p.username))}
+
+async function resharePost(postId){
+ if(!currentUser){notice("Sign in to reshare.");return}
+ const {error}=await db.from("reshares").upsert({user_id:currentUser.id,post_id:postId},{onConflict:"user_id,post_id"});
+ if(error){notice("Reshare setup: "+error.message);return}
+ notice("Post reshared. The original creator remains credited.");
+}
+async function sendSuggestion(){
+ if(!currentUser){notice("Sign in to send a suggestion.");return}
+ const message=prompt("What would you like Aurem World to improve?");
+ if(!message?.trim())return;
+ const {error}=await db.from("suggestions").insert({user_id:currentUser.id,body:message.trim()});
+ if(error)notice("Suggestion box setup: "+error.message);else notice("Thank you. Your suggestion was sent to the Aurem World team.");
+}
+async function showAdminDashboard(){
+ if(currentProfile?.username!==OWNER_USERNAME){notice("Admin access only.");return}
+ const [{count:users},{count:posts},{count:likes},{data:active},{data:allUsers}]=await Promise.all([
+  db.from("profiles").select("*",{count:"exact",head:true}),
+  db.from("posts").select("*",{count:"exact",head:true}),
+  db.from("likes").select("*",{count:"exact",head:true}),
+  db.from("user_presence").select("user_id,last_seen"),
+  db.from("profiles").select("id,username,created_at").order("created_at",{ascending:false}).limit(100)
+ ]);
+ if(!users && users!==0){notice("Admin statistics could not be loaded. Check the migration and table permissions.");return}
+ const cutoff=Date.now()-5*60*1000, activeIds=new Set((active||[]).filter(x=>new Date(x.last_seen).getTime()>cutoff).map(x=>x.user_id));
+ const box=document.createElement("section");box.className="panel admin-panel";
+ box.innerHTML=`<h3>Aurem World Admin</h3><div class="admin-stats"><span><b>${users||0}</b>Users</span><span><b>${activeIds.size}</b>Active now</span><span><b>${Math.max(0,(users||0)-activeIds.size)}</b>Inactive</span><span><b>${likes||0}</b>Total likes</span><span><b>${posts||0}</b>Posts</span></div><h4>Recent users</h4>${(allUsers||[]).map(u=>`<div class="request-row">@${esc(u.username)}</div>`).join("")}`;
+ $("profile-view").prepend(box);
+ const {data:suggestions}=await db.from("suggestions").select("id,body,created_at,profiles(username)").order("created_at",{ascending:false}).limit(50);
+ const sug=document.createElement("section");sug.className="panel";sug.innerHTML="<h3>Suggestions</h3>"+((suggestions||[]).map(s=>`<p><b>@${esc(s.profiles?.username||"user")}</b>: ${esc(s.body)}</p>`).join("")||"<p>No suggestions yet.</p>");
+ box.after(sug);
+}
+async function updatePresence(){
+ if(!currentUser)return;
+ const payload={user_id:currentUser.id,last_seen:new Date().toISOString()};
+ const {error}=await db.from("user_presence").upsert(payload,{onConflict:"user_id"});
+ if(error)console.debug("Presence update:",error.message);
+}
+async function updateChatStreak(){
+ if(!activeChat||!currentUser)return;
+ const {error}=await db.rpc("record_chat_activity",{p_conversation_id:activeChat});
+ if(error)console.debug("Chat streak migration:",error.message);
+}
+
+async function loadProfile(id){if(!id){$("profile-view").innerHTML='<div class="empty">Sign in to view your profile.</div>';return}let {data:p}=await db.from("profiles").select("*").eq("id",id).single();let [{count:followers},{count:following},{data:posts}]=await Promise.all([db.from("follows").select("*",{count:"exact",head:true}).eq("following_id",id),db.from("follows").select("*",{count:"exact",head:true}).eq("follower_id",id),db.from("posts").select("*").eq("user_id",id).order("created_at",{ascending:false})]);let creatorLikes=0;
+ const {data:likeRows}=await db.from("posts").select("id,post_counts(like_count)").eq("user_id",id);
+ creatorLikes=(likeRows||[]).reduce((sum,row)=>sum+(row.post_counts?.like_count||0),0);
+ $("profile-view").innerHTML=`<div class="profile-head"><div class="profile-avatar">${p?.avatar_url?`<img src="${esc(p.avatar_url)}" alt="Profile picture">`:esc((p?.display_name||p?.username||"U")[0].toUpperCase())}</div><div><h2>${esc(p?.display_name||p?.username)} ${p?.is_verified?'<span class="verified">✓</span>':""}</h2><div>@${esc(p?.username||"")}</div><div class="profile-stats"><span>${posts?.length||0} posts</span><span>${followers||0} followers</span><span>${following||0} following</span><span>${creatorLikes} likes</span></div><div class="profile-actions">${id===currentUser?.id?'<button class="primary-btn" id="edit-profile">Edit profile</button><label class="profile-upload">Change photo<input id="avatar-file" type="file" accept="image/*"></label><button class="avatar" id="privacy-toggle">'+(p.is_private?'Make public':'Make private')+'</button>':`<button class="primary-btn" id="profile-follow">Follow</button><button class="avatar" id="profile-message">Message</button>`}${id===currentUser?.id?'<button class="avatar" id="suggestion-open">Suggestion box</button>':""}${currentProfile?.username===OWNER_USERNAME?'<button class="primary-btn" id="admin-open">Admin dashboard</button>':""}</div></div><div class="profile-grid">${(posts||[]).map(x=>x.media_type==="video"?`<video src="${esc(x.media_url)}" controls></video>`:`<img src="${esc(x.media_url)}">`).join("")}</div>`;$("suggestion-open")?.addEventListener("click",sendSuggestion);$("admin-open")?.addEventListener("click",showAdminDashboard);$("edit-profile")?.addEventListener("click",async()=>{let name=prompt("Display name",p.display_name||"");if(name!==null){let {error}=await db.from("profiles").update({display_name:name}).eq("id",currentUser.id);if(error)notice(error.message);else loadProfile(id)}});$("avatar-file")?.addEventListener("change",async e=>{const file=e.target.files[0];if(!file)return;if(!file.type.startsWith("image/")){notice("Choose an image file.");return}const path=`${currentUser.id}/avatar-${Date.now()}.${file.name.split(".").pop()}`;const {error:upErr}=await db.storage.from("avatars").upload(path,file,{upsert:true,contentType:file.type});if(upErr){notice(upErr.message);return}const {data}=db.storage.from("avatars").getPublicUrl(path);const {error}=await db.from("profiles").update({avatar_url:data.publicUrl}).eq("id",currentUser.id);if(error)notice(error.message);else{notice("Profile picture updated.");loadProfile(id)}});$("privacy-toggle")?.addEventListener("click",async()=>{const {error}=await db.from("profiles").update({is_private:!p.is_private}).eq("id",currentUser.id);if(error)notice(error.message);else{notice(p.is_private?"Your account is now public.":"Your account is now private.");loadProfile(id)}});if(id===currentUser?.id){db.from("follow_requests").select("id,requester_id,profiles!follow_requests_requester_id_fkey(username,display_name)").eq("target_id",id).eq("status","pending").then(({data,error})=>{if(error){notice("Follow requests: "+error.message);return}if(data?.length){const box=document.createElement("div");box.className="panel follow-requests";box.innerHTML="<h3>Follow requests</h3>"+data.map(r=>`<div class="request-row"><span>@${esc(r.profiles?.username||"user")}</span><button class="primary-btn" data-approve="${r.id}">Approve</button><button class="avatar" data-decline="${r.id}">Decline</button></div>`).join("");$("profile-view").insertBefore(box,$("profile-view").querySelector(".profile-grid"));box.querySelectorAll("[data-approve]").forEach(btn=>btn.onclick=async()=>{const {error}=await db.rpc("approve_follow_request",{request_id:btn.dataset.approve});if(error){notice(error.message);return}notice("Follow request approved.");loadProfile(id)});box.querySelectorAll("[data-decline]").forEach(btn=>btn.onclick=async()=>{const {error}=await db.from("follow_requests").update({status:"declined"}).eq("id",btn.dataset.decline);if(error)notice(error.message);else loadProfile(id)});}})}$("profile-follow")?.addEventListener("click",()=>toggleFollow(id,$("profile-follow")));$("profile-message")?.addEventListener("click",()=>openChat(id,p.username))}
 async function searchUsers(q){if(!q.trim())return;$("search-results").innerHTML="Searching…";let {data,error}=await db.from("profiles").select("id,username,display_name,is_verified").ilike("username",`%${q}%`).limit(10);$("search-results").innerHTML=error?esc(error.message):(data||[]).map(u=>`<div class="search-result" data-id="${u.id}"><b>${esc(u.display_name||u.username)}</b> @${esc(u.username)} ${u.is_verified?"✓":""}</div>`).join("")||"No users found.";document.querySelectorAll(".search-result").forEach(x=>x.onclick=()=>{loadProfile(x.dataset.id);setView("profile");$("search-panel").classList.add("hidden")})}
 $("search-input").oninput=e=>{if(requireDb())searchUsers(e.target.value)};
 async function loadInbox(){if(!currentUser){$("inbox-list").innerHTML="Sign in to view messages.";return}let {data,error}=await db.from("conversations").select("id, user_a, user_b").or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);if(error){$("inbox-list").textContent=error.message;return}let otherIds=(data||[]).map(c=>c.user_a===currentUser.id?c.user_b:c.user_a);if(!otherIds.length){$("inbox-list").textContent="No conversations yet. Find a creator in Discover to message.";return}let {data:users}=await db.from("profiles").select("id,username").in("id",otherIds);$("inbox-list").innerHTML=(users||[]).map(u=>`<div class="search-result" data-id="${u.id}" data-name="${esc(u.username)}">@${esc(u.username)} — Open chat</div>`).join("");document.querySelectorAll("#inbox-list [data-id]").forEach(x=>x.onclick=()=>openChat(x.dataset.id,x.dataset.name))}
-async function openChat(otherId,name){if(!currentUser){notice("Sign in to message.");return}let {data:conv,error}=await db.rpc("get_or_create_conversation",{other_user_id:otherId});if(error){notice("Messaging setup: "+error.message);return}activeChat=conv;$("chat-title").textContent="@"+name;$("chat-messages").innerHTML="Loading…";showDialog("chat-dialog");await refreshChat();db.channel("chat-"+conv).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conv}`},refreshChat).subscribe()}
-async function refreshChat(){if(!activeChat)return;let {data,error}=await db.from("messages").select("id,sender_id,body,created_at").eq("conversation_id",activeChat).order("created_at").limit(100);$("chat-messages").innerHTML=error?esc(error.message):(data||[]).map(m=>`<div class="message ${m.sender_id===currentUser.id?"mine":""}">${esc(m.body)}</div>`).join("");$("chat-messages").scrollTop=$("chat-messages").scrollHeight}
-$("chat-form").onsubmit=async e=>{e.preventDefault();if(!activeChat||!currentUser)return;let body=$("chat-input").value.trim();if(!body)return;let {error}=await db.from("messages").insert({conversation_id:activeChat,sender_id:currentUser.id,body});if(error)notice(error.message);else{$("chat-input").value="";refreshChat()}};
+async function openChat(otherId,name){if(!currentUser){notice("Sign in to message.");return}let {data:conv,error}=await db.rpc("get_or_create_conversation",{other_user_id:otherId});if(error){notice("Messaging setup: "+error.message);return}activeChat=conv;if(activeChatChannel)db.removeChannel(activeChatChannel);$("chat-title").textContent="@"+name;$("chat-messages").innerHTML="Loading…";showDialog("chat-dialog");await refreshChat();activeChatChannel=db.channel("chat-"+conv).on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conv}`},refreshChat).subscribe()}
+async function refreshChat(){if(!activeChat)return;let {data,error}=await db.from("messages").select("id,sender_id,body,created_at").eq("conversation_id",activeChat).order("created_at").limit(100);$("chat-messages").innerHTML=error?esc(error.message):(data||[]).map(m=>`<div class="message ${m.sender_id===currentUser.id?"mine":""}">${String(m.body||"").startsWith("VOICE_NOTE:")?`<audio controls src="${esc(m.body.slice(11))}"></audio>`:esc(m.body)}</div>`).join("");$("chat-messages").scrollTop=$("chat-messages").scrollHeight}
+$("chat-form").onsubmit=async e=>{e.preventDefault();if(!activeChat||!currentUser)return;let body=$("chat-input").value.trim();if(!body)return;let {error}=await db.from("messages").insert({conversation_id:activeChat,sender_id:currentUser.id,body});if(error)notice(error.message);else{$("chat-input").value="";await updateChatStreak();refreshChat()}};
+
+let voiceRecorder=null, voiceChunks=[];
+document.addEventListener("click",async e=>{
+ if(e.target?.id!=="voice-note-btn")return;
+ if(!currentUser||!activeChat){notice("Open a conversation first.");return}
+ const btn=e.target;
+ if(voiceRecorder?.state==="recording"){voiceRecorder.stop();btn.textContent="🎙 Voice";return}
+ if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){notice("Voice recording is not supported in this browser.");return}
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  voiceChunks=[];voiceRecorder=new MediaRecorder(stream);
+  voiceRecorder.ondataavailable=ev=>{if(ev.data.size)voiceChunks.push(ev.data)};
+  voiceRecorder.onstop=async()=>{
+   stream.getTracks().forEach(t=>t.stop());
+   const blob=new Blob(voiceChunks,{type:voiceRecorder.mimeType||"audio/webm"});
+   const path=`${currentUser.id}/voice-${crypto.randomUUID()}.webm`;
+   const {error:upErr}=await db.storage.from("voice-notes").upload(path,blob,{contentType:blob.type});
+   if(upErr){notice("Voice note upload: "+upErr.message);return}
+   const {data}=db.storage.from("voice-notes").getPublicUrl(path);
+   const {error}=await db.from("messages").insert({conversation_id:activeChat,sender_id:currentUser.id,body:"VOICE_NOTE:"+data.publicUrl});
+   if(error)notice(error.message);else{await updateChatStreak();refreshChat()}
+  };
+  voiceRecorder.start();btn.textContent="■ Stop";
+ }catch(err){notice("Microphone permission is needed to record a voice note.")}
+});
+
 (async()=>{if(!configured){$("feed").innerHTML='<div class="empty"><b>Welcome to Aurem World.</b><br>To activate accounts, uploads, likes, comments and messaging, configure Supabase using the included SETUP.md and supabase.sql files.</div>'}else await loadSession()})();
 
 // Private-account follow requests: requests are approved by the account owner.
