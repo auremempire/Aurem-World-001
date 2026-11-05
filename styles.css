@@ -5,3 +5,43 @@
 .profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}.profile-upload{display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer}.profile-upload input{max-width:155px;padding:4px;border:0;background:transparent;font-size:11px}.request-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}.request-row span{flex:1}
 
 .admin-panel{margin-bottom:16px}.admin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin:14px 0}.admin-stats span{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--muted);font-size:12px}.admin-stats b{display:block;color:var(--gold);font-size:22px}.message audio{max-width:100%;width:240px}.post-actions .action:disabled{opacity:.5}
+
+/* Aurem World responsive layout and post order */
+.post{display:flex;flex-direction:column;max-width:760px;width:100%;min-width:0}
+.post-main{display:flex;align-items:stretch;min-width:0}
+.post-info{flex:1;min-width:0;overflow-wrap:anywhere}
+.creator-link{border:0;background:transparent;color:inherit;text-align:left;padding:0;cursor:pointer}
+.post-actions{flex:0 0 68px;justify-content:flex-start;gap:12px;padding:12px 5px}
+.media-wrap{width:100%;aspect-ratio:9/12;min-height:0;max-height: min(78vh,760px);height:auto}
+.media-wrap video,.media-wrap img{display:block;width:100%;height:100%;max-height:inherit;object-fit:contain}
+.profile-grid video,.profile-grid img{width:100%;height:100%;min-height:0;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:#08060d}
+html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
+.layout,.content,.feed,#profile-view,#inbox-view{min-width:0;width:100%;max-width:100%}
+img,video{max-width:100%}
+@media(max-width:760px){
+ .topbar{width:100%;padding:0 10px;gap:6px}
+ .top-actions{gap:6px}.top-actions .primary-btn{padding:9px 10px}
+ .layout{padding:12px 8px calc(82px + env(safe-area-inset-bottom))}
+ .post{border-radius:13px}
+ .post-main{display:grid;grid-template-columns:minmax(0,1fr) 54px}
+ .post-info{padding:11px 10px}
+ .post-actions{flex-direction:column;align-items:center;justify-content:flex-start;gap:11px;padding:10px 2px}
+ .action{font-size:19px}.action small{font-size:9px}
+ .media-wrap{aspect-ratio:9/12;max-height:70vh}
+ .profile-head{flex-wrap:wrap;align-items:flex-start}
+ .profile-head>div:last-child{min-width:0;max-width:100%}
+ .profile-stats{display:flex;flex-wrap:wrap;gap:10px}
+ .profile-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+ .profile-grid video,.profile-grid img{min-width:0}
+ .modal{max-height:calc(100dvh - 24px);overflow:auto}
+ .modal-card{padding:22px 16px}
+ #chat-form{display:flex;gap:6px;flex-wrap:wrap}
+ #chat-form input{min-width:0;flex:1}
+}
+
+/* Feed order: creator/caption, actions, then media. */
+.post>div:first-child{display:contents}
+.post-info{order:1}
+.post-actions{order:2}
+.post>.media-wrap{order:3}
+.creator-link{display:flex;width:100%;border:0;background:transparent;color:inherit;text-align:left;align-items:center;gap:8px;padding:0}
