@@ -1,16 +1,25 @@
-AUREM WORLD — COMPLETE FEATURE UPDATE
+AUREM WORLD — FEED, RESHARE, PRIVATE SUGGESTIONS & MESSAGING UPDATE
 
-This package preserves the latest Aurem World app source and adds the mobile layout/feed ordering and clickable creator profiles.
+Files to replace in the ROOT of your existing GitHub repository:
+- index.html
+- app.js
+- styles.css
+- aurem-world-icon.png
 
-FILES
-- index.html, app.js, styles.css, aurem-world-icon.png: replace the matching files in the root of your existing GitHub repository.
-- AUREM_WORLD_FEATURE_MIGRATION.sql: additive setup for reshares, suggestions, presence, chat activity and voice-note storage.
-- PROFILE_PRIVACY_MIGRATION.sql, POST_DELETE_PERMISSIONS.sql, FIX_DATABASE.sql: supporting migrations from the existing setup. Run only migrations you have not already run; do not rerun older migrations blindly.
+Supabase:
+1. Open the SQL Editor.
+2. Run MESSAGING_AND_FEATURES_FIX.sql.
+3. Do not run the older feature migration again; the reshare and private suggestion tables/admin setup were already run in this chat.
 
-IMPORTANT
-- The app uses the existing Supabase project configured in app.js. Never put a service-role/secret key in browser code.
-- The feature migration assumes the existing profiles, posts, conversations and messages tables are already present.
-- Admin dashboard access is currently keyed to the owner username in the client; this is not a secure production admin boundary. Use server-side role/RPC authorization before handling sensitive admin actions.
-- Chat streak recording stores daily chat activity; a full two-person consecutive-day streak display still needs a dedicated UI and verified database logic.
-- Notifications are not fully implemented in this package. Do not treat the app as production-complete until backend policies, realtime behavior, and each feature are tested with two separate accounts.
-- Likes and follows remain voluntary and reversible.
+What this update includes:
+- TikTok-inspired full-height mobile post layout and action rail.
+- Reshare action and original creator credit.
+- Private suggestion submission; only users in app_admins can read suggestions.
+- Admin suggestion inbox/dashboard for the registered owner account.
+- Profile navigation from creator name/avatar.
+- Messaging fixes: normalizes the conversation RPC result, displays errors, loads existing conversations, sends and refreshes messages, and subscribes to new messages.
+
+Important:
+- This is a best-effort update based on the existing source files and known schema. Test with two accounts after deployment.
+- The messaging SQL assumes conversations has id,user_a,user_b and messages has id,conversation_id,sender_id,body,created_at, matching the existing app code. If SQL reports a missing column, stop and share the exact error; do not delete tables.
+- Existing database records are not deleted.

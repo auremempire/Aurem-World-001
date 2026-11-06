@@ -45,3 +45,32 @@ img,video{max-width:100%}
 .post-actions{order:2}
 .post>.media-wrap{order:3}
 .creator-link{display:flex;width:100%;border:0;background:transparent;color:inherit;text-align:left;align-items:center;gap:8px;padding:0}
+
+
+/* TikTok-inspired mobile feed: media fills the post, action rail overlays right side. */
+.post{position:relative;display:block;isolation:isolate;overflow:hidden;background:#08060d;border:0;border-radius:14px;max-width:760px;width:100%;height:min(82svh,820px);min-height:500px;margin:0 auto}
+.post .media-wrap{position:absolute;inset:0;width:100%;height:100%;max-height:none;min-height:0;aspect-ratio:auto;background:#08060d;z-index:-1}
+.post .media-wrap video,.post .media-wrap img{width:100%;height:100%;max-height:none;object-fit:contain;background:#08060d}
+.post .post-info{position:absolute;left:12px;right:76px;bottom:12px;z-index:2;padding:12px 10px;color:#fff;text-shadow:0 1px 4px #000}
+.post .creator-link{color:#fff;text-shadow:0 1px 4px #000}
+.post .caption{color:#fff;margin:9px 0 0;font-size:14px;line-height:1.4}
+.post .post-actions{position:absolute;right:7px;bottom:18px;z-index:3;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:17px;padding:8px 2px;color:#fff}
+.post .action{color:#fff;text-shadow:0 1px 5px #000;font-size:25px;min-width:44px}
+.post .action small{font-size:11px;color:#fff}
+.post .action.liked{color:#ff4f87}
+.post .action:disabled{opacity:.55}
+#suggestion-dialog .modal-card{gap:14px}
+#suggestion-dialog textarea{min-height:130px}
+@media(max-width:760px){
+ .layout{padding:8px 0 calc(76px + env(safe-area-inset-bottom))}
+ .content{padding:0;width:100%}
+ .feed{gap:8px}
+ .post{width:100%;max-width:none;height:calc(100svh - 138px - env(safe-area-inset-bottom));min-height:460px;border-radius:0}
+ .post .media-wrap{inset:0}
+ .post .media-wrap video,.post .media-wrap img{object-fit:contain}
+ .post .post-info{left:10px;right:72px;bottom:8px;padding:10px 7px}
+ .post .post-actions{right:5px;bottom:15px;gap:15px}
+ .post .action{font-size:24px}
+ .post .action small{font-size:10px}
+ .section-heading{padding:0 12px;margin:6px 0 10px}
+}
